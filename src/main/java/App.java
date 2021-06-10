@@ -3,7 +3,6 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
 import java.io.IOException;
-import java.util.Properties;
 
 public class App {
     public static void main(String[] args) throws IOException, TelegramApiException {
