@@ -213,14 +213,11 @@ public class Bot extends TelegramLongPollingBot {
                     if(commands[i].equals("cancel")){
                         Files.copy(Paths.get(getPathToInitImg(chatId)), Paths.get(getPathToTmpClearImg(chatId)),  StandardCopyOption.REPLACE_EXISTING);
                     }
-                } catch (IOException | TelegramApiException e) {
-                    e.printStackTrace();
-                } catch (InterruptedException e) {
+                } catch (IOException | TelegramApiException | InterruptedException e) {
                     e.printStackTrace();
                 }
 
         }
-        sendMsg(update.getMessage().getChatId().toString(), messageTxt);
     }
 
     private void sendMsg(String chatId, String s) {
