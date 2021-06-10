@@ -1,3 +1,5 @@
+import org.apache.commons.io.FileUtils;
+import org.glassfish.grizzly.utils.Pair;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -8,7 +10,9 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import javax.imageio.ImageIO;
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -26,11 +30,12 @@ public class Bot extends TelegramLongPollingBot {
 
     private final String strPathToUsers = "/Users/pk/IdeaProjects/bot/src/main/users/";
     private final Map<String, Color> colors = ColorsAndFontsSupplier.getColors();
-    private final Map<String, Font> fonts = ColorsAndFontsSupplier.getFonts();
+    private final Map<Integer, Pair> coordinates = Map.of(1, new Pair<>(729, 608),  //
+                                                          2, new Pair<>(861, 154));
     private enum ImgType{INIT, ADDING}
     private Map<Long, ImgType> imgType = new HashMap<>();
     private Map<Long, Integer> savedCount = new HashMap<>();
-    private Map<Long, Integer> userFonts = new HashMap<>();
+    private Map<Long, Integer> userFontSizes = new HashMap<>();
     private Map<Long, String> userColors = new HashMap<>();
     private boolean videoWaiting = false;
 
@@ -48,7 +53,7 @@ public class Bot extends TelegramLongPollingBot {
          return token;
     }
 
-    public void onUpdateReceived(Update update) {
+    public synchronized void onUpdateReceived(Update update) {
         Message message = update.getMessage();
         Long chatId = message.getChatId();
 
@@ -62,9 +67,11 @@ public class Bot extends TelegramLongPollingBot {
             videoWaiting = false;
         }
         String messageTxt = update.getMessage().getText();
+        String userText = getText(messageTxt);
+        String replacedTxt = messageTxt.replace(";" + userText + ";", "").replace("  ", " ");
         String[] commands = new String[0];
         if(messageTxt != null) {
-            commands = messageTxt.split(" ");
+            commands = replacedTxt.split(" ");
         }
         for (int i = 0; i < commands.length; i++) {
                 try {
@@ -79,7 +86,7 @@ public class Bot extends TelegramLongPollingBot {
                     }
                     if(commands[i].equals("font")) {
                         if (i + 1 < commands.length) {
-                            userFonts.put(chatId, Integer.valueOf(commands[i + 1]));
+                            userFontSizes.put(chatId, Integer.valueOf(commands[i + 1]));
                         }
                     }
                     if(commands[i].equals("color")){
@@ -99,13 +106,13 @@ public class Bot extends TelegramLongPollingBot {
                         }
                     }
                     if(commands[i].equals("addtext")) {
-                        if (i + 3 < commands.length) {
+                        if (i + 2 < commands.length) {
                             Font tmpFont;
                             Color tmpColor;
-                            if(userFonts.containsKey(chatId)){ tmpFont = fonts.get(userFonts.get(chatId).toString()); }else{ tmpFont = fonts.get("1"); }
+                            if(userFontSizes.containsKey(chatId)){ tmpFont = ColorsAndFontsSupplier.getFont(userFontSizes.get(chatId));}else{tmpFont = ColorsAndFontsSupplier.getFont(36);}
                             if(userColors.containsKey(chatId)){ tmpColor = colors.get(userColors.get(chatId)); }else{ tmpColor = colors.get("white"); }
-                            editor.addTextIMG(getPathToTmpClearImg(chatId), commands[i + 1], tmpFont, tmpColor,
-                                    Integer.valueOf(commands[i + 2]), Integer.valueOf(commands[i + 3]));
+                            editor.addTextIMG(getPathToTmpClearImg(chatId), userText, tmpFont, tmpColor,
+                                    Integer.valueOf(commands[i + 1]), Integer.valueOf(commands[i + 2]));
 
                             Files.copy(Paths.get(getPathToTmpClearImg(chatId)), Paths.get(getPathToTmpLinImg(chatId)), StandardCopyOption.REPLACE_EXISTING);
                             editor.addImageIMG(getPathToTmpLinImg(chatId), getPathToLineyka(), 0, 0);
@@ -113,14 +120,16 @@ public class Bot extends TelegramLongPollingBot {
                         }
                     }
                     if(commands[i].equals("addtextvid")) {
-                        if (i + 3 < commands.length) {
+                        if (i + 2 < commands.length) {
                             Font tmpFont;
                             Color tmpColor;
-                            if(userFonts.containsKey(chatId)){ tmpFont = fonts.get(userFonts.get(chatId).toString()); }else{ tmpFont = fonts.get("1"); }
+                            if(userFontSizes.containsKey(chatId)){ tmpFont = ColorsAndFontsSupplier.getFont(userFontSizes.get(chatId));}else{tmpFont = ColorsAndFontsSupplier.getFont(36);}
                             if(userColors.containsKey(chatId)){ tmpColor = colors.get(userColors.get(chatId)); }else{ tmpColor = colors.get("white"); }
-                            editor.addTextVID(strPathToUsers + chatId, commands[i + 1], tmpFont, tmpColor,
-                                    Integer.valueOf(commands[i + 2]), Integer.valueOf(commands[i + 3]));
+                            editor.addTextIMG(getPathToTmpClearImg(chatId), userText, tmpFont, tmpColor,
+                                    Integer.valueOf(commands[i + 1]), Integer.valueOf(commands[i + 2]));
+
                             sendVideo(chatId, getPathToVideo(chatId));
+                            FileUtils.cleanDirectory(new File(getPathToCutImgs(chatId)));
                         }
                     }
                     if(commands[i].equals("addimage")) {
@@ -132,6 +141,71 @@ public class Bot extends TelegramLongPollingBot {
                             sendPhoto(chatId, getPathToTmpLinImg(chatId));
                         }
                     }
+                    if(commands[i].equals("resize")){
+                        if(i + 2 < commands.length){
+                            editor.resizeImageIMG(getPathToTmpClearImg(chatId), Integer.valueOf(commands[i+1]), Integer.valueOf(commands[i+2]));
+                            Files.copy(Paths.get(getPathToTmpClearImg(chatId)), Paths.get(getPathToTmpLinImg(chatId)), StandardCopyOption.REPLACE_EXISTING);
+
+                            editor.addImageIMG(getPathToTmpLinImg(chatId), getPathToLineyka(), 0, 0);
+                            sendPhoto(chatId, getPathToTmpLinImg(chatId));
+                        }
+                    }
+                    if(commands[i].equals("scale")){
+                        if(i+1 < commands.length){
+                            editor.scaleImageIMG(getPathToTmpClearImg(chatId), Float.valueOf(commands[i+1]));
+                            Files.copy(Paths.get(getPathToTmpClearImg(chatId)), Paths.get(getPathToTmpLinImg(chatId)), StandardCopyOption.REPLACE_EXISTING);
+
+                            editor.addImageIMG(getPathToTmpLinImg(chatId), getPathToLineyka(), 0, 0);
+                            sendPhoto(chatId, getPathToTmpLinImg(chatId));
+                        }
+                    }
+                    if(commands[i].equals("demotivator")){
+                        if(i+1 < commands.length){
+                            Files.copy(Paths.get(getPathToTemplates() + "/demot.jpeg"), Paths.get(getPathToInitImg(chatId)), StandardCopyOption.REPLACE_EXISTING);
+                            Files.copy(Paths.get(getPathToTemplates() + "/demot.jpeg"), Paths.get(getPathToTmpClearImg(chatId)), StandardCopyOption.REPLACE_EXISTING);
+                            Files.copy(Paths.get(getPathToSaved(chatId) + "/" + Integer.valueOf(commands[i+1]) + ".jpg"),
+                                    Paths.get(getPathToAddingImg(chatId)), StandardCopyOption.REPLACE_EXISTING);
+                            editor.resizeImageIMG(getPathToAddingImg(chatId), 617, 617);
+                            editor.addImageIMG(getPathToInitImg(chatId),getPathToAddingImg(chatId), 79, 46);
+                            editor.addTextIMG(getPathToInitImg(chatId), userText, ColorsAndFontsSupplier.getFont(48),
+                                    colors.get("white"), 387 - 25*(userText.length()/2), 750);
+                            sendPhoto(chatId, getPathToInitImg(chatId));
+                        }
+                    }
+                    if(commands[i].equals("template")){
+                        if(i + 1 < commands.length){
+                            int index = Integer.valueOf(commands[i+1]);
+                            int x = (int)coordinates.get(index).getFirst() - 25*(userText.length()/2);
+                            int y = (int)coordinates.get(index).getSecond();
+                            Files.copy(Paths.get(getPathToTemplates() + "/" + index + ".jpeg"), Paths.get(getPathToInitImg(chatId)), StandardCopyOption.REPLACE_EXISTING);
+                            Files.copy(Paths.get(getPathToTemplates() + "/" + index + ".jpeg"), Paths.get(getPathToTmpClearImg(chatId)), StandardCopyOption.REPLACE_EXISTING);
+                            Font tmpFont;
+                            Color tmpColor;
+                            if(userFontSizes.containsKey(chatId)){ tmpFont = ColorsAndFontsSupplier.getFont(userFontSizes.get(chatId));}else{tmpFont = ColorsAndFontsSupplier.getFont(36);}
+                            tmpColor = colors.get("black");
+                            editor.addTextIMG(getPathToInitImg(chatId), userText, tmpFont,
+                                    tmpColor, x, y);
+
+                            sendPhoto(chatId, getPathToInitImg(chatId));
+                        }
+                    }
+                    if(commands[i].equals("loadtoinit")){
+                        if(i+1 < commands.length){
+                            int num = Integer.valueOf(commands[i + 1]);
+                            Files.copy(Paths.get(getPathToSaved(chatId) + "/" + num + ".jpg"), Paths.get(getPathToInitImg(chatId)), StandardCopyOption.REPLACE_EXISTING);
+                            Files.copy(Paths.get(getPathToSaved(chatId) + "/" + num + ".jpg"), Paths.get(getPathToTmpClearImg(chatId)), StandardCopyOption.REPLACE_EXISTING);
+                        }
+                    }
+                    if(commands[i].equals("loadtoadding")){
+                        if(i+1 < commands.length){
+                            int num = Integer.valueOf(commands[i + 1]);
+                            Files.copy(Paths.get(getPathToSaved(chatId) + "/" + num + ".jpg"), Paths.get(getPathToAddingImg(chatId)), StandardCopyOption.REPLACE_EXISTING);
+                        }
+                    }
+                    if(commands[i].equals("showsaved")){
+                        showSaved(chatId);
+                        sendPhoto(chatId, getPathToSaved(chatId) + "/allSaved.jpg");
+                    }
                     if(commands[i].equals("apply")){
                         Files.copy(Paths.get(getPathToTmpClearImg(chatId)), Paths.get(getPathToInitImg(chatId)), StandardCopyOption.REPLACE_EXISTING);
                         sendPhoto(chatId, getPathToInitImg(chatId));
@@ -139,13 +213,14 @@ public class Bot extends TelegramLongPollingBot {
                     if(commands[i].equals("cancel")){
                         Files.copy(Paths.get(getPathToInitImg(chatId)), Paths.get(getPathToTmpClearImg(chatId)),  StandardCopyOption.REPLACE_EXISTING);
                     }
-                } catch (IOException | TelegramApiException | InterruptedException e) {
+                } catch (IOException | TelegramApiException e) {
                     e.printStackTrace();
                 }
 
         }
         sendMsg(update.getMessage().getChatId().toString(), messageTxt);
     }
+
     private void sendMsg(String chatId, String s) {
         SendMessage answer = new SendMessage();
         answer.setText(s);
@@ -156,6 +231,7 @@ public class Bot extends TelegramLongPollingBot {
             e.printStackTrace();
         }
     }
+
     private void sendPhoto(Long chatId, String path) throws TelegramApiException {
         SendPhoto sendPhoto = new SendPhoto(chatId.toString(), new InputFile(new File(path)));
         this.execute(sendPhoto);
@@ -164,7 +240,6 @@ public class Bot extends TelegramLongPollingBot {
         SendVideo sendVideo = new SendVideo(chatId.toString(), new InputFile(new File(path)));
         this.execute(sendVideo);
     }
-
 
     private void initializeUser(Long chatId){
         savedCount.put(chatId, 1);
@@ -180,18 +255,13 @@ public class Bot extends TelegramLongPollingBot {
         File file = new File(strPath);
         return file.mkdir();
     }
+
     private String getPathToImgs(Long chatId){
         return Paths.get(strPathToUsers + chatId + "/images").toString();
     }
-    private String getPathToSaved(Long chatId){
-        return Paths.get(strPathToUsers + chatId + "/saved").toString();
-    }
-    private String getPathToVideoDir(Long chatId){
-        return Paths.get(strPathToUsers + chatId + "/video").toString();
-    }
-    private String getPathToCutImgs(Long chatId){
-        return Paths.get(strPathToUsers + chatId + "/video/cutImages").toString();
-    }
+    private String getPathToSaved(Long chatId){ return Paths.get(strPathToUsers + chatId + "/saved").toString(); }
+    private String getPathToVideoDir(Long chatId){ return Paths.get(strPathToUsers + chatId + "/video").toString(); }
+    private String getPathToCutImgs(Long chatId){ return Paths.get(strPathToUsers + chatId + "/video/cutImages").toString(); }
     private String getPathToInitImg(Long chatId){
         return getPathToImgs(chatId) + "/initImg.jpg";
     }
@@ -249,6 +319,15 @@ public class Bot extends TelegramLongPollingBot {
             e.printStackTrace();
         }
     }
+    private String getText(String s) {
+        if(s.contains(";")) {
+            int i1 = s.indexOf(';');
+            int i2 = s.lastIndexOf(';');
+            return s.substring(i1 + 1, i2);
+        }else{
+            return s;
+        }
+    }
     private void save(Long chatId, Integer num) throws IOException {
         if(num >= 1 && num <=9) {
             Files.copy(Paths.get(getPathToInitImg(chatId)), Paths.get(getPathToSaved(chatId) + "/" + num + ".jpg"), StandardCopyOption.REPLACE_EXISTING);
@@ -267,12 +346,22 @@ public class Bot extends TelegramLongPollingBot {
         }
 
     }
+    private void showSaved(Long chatId) throws IOException {
+        BufferedImage tmpImage = new BufferedImage(900, 900, BufferedImage.TYPE_INT_RGB);
+        Graphics tmpG = tmpImage.createGraphics();
+        for (int i = 0; i < 3; i++)
+            for (int j = 0; j < 3; j++) {
+                int curNum = i*3 + j + 1;
+                BufferedImage savedImage;
+                if(Files.exists(Paths.get(getPathToSaved(chatId) + "/" + curNum + ".jpg"))) {
+                    savedImage = ImageIO.read(new File(getPathToSaved(chatId) + "/" + curNum + ".jpg"));
+                }else{
+                    continue;
+                }
+                tmpG.drawImage(savedImage, 300*i, 300*j, 300, 300, null);
+            }
+        ImageIO.write(tmpImage, "jpg", new File(getPathToSaved(chatId) + "/allSaved.jpg"));
+    }
 }
-/*
-* не работает scale
-* размер шрифта
-* проверить несколько команд сразу
-* concurrency(для видео тоже)
-* добваить вывод всех сохраненных пикч
-* */
+
 
