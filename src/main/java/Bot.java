@@ -125,7 +125,7 @@ public class Bot extends TelegramLongPollingBot {
                             Color tmpColor;
                             if(userFontSizes.containsKey(chatId)){ tmpFont = ColorsAndFontsSupplier.getFont(userFontSizes.get(chatId));}else{tmpFont = ColorsAndFontsSupplier.getFont(36);}
                             if(userColors.containsKey(chatId)){ tmpColor = colors.get(userColors.get(chatId)); }else{ tmpColor = colors.get("white"); }
-                            editor.addTextIMG(getPathToTmpClearImg(chatId), userText, tmpFont, tmpColor,
+                            editor.addTextVID(getPathToTmpClearImg(chatId), userText, tmpFont, tmpColor,
                                     Integer.valueOf(commands[i + 1]), Integer.valueOf(commands[i + 2]));
 
                             sendVideo(chatId, getPathToVideo(chatId));
@@ -214,6 +214,8 @@ public class Bot extends TelegramLongPollingBot {
                         Files.copy(Paths.get(getPathToInitImg(chatId)), Paths.get(getPathToTmpClearImg(chatId)),  StandardCopyOption.REPLACE_EXISTING);
                     }
                 } catch (IOException | TelegramApiException e) {
+                    e.printStackTrace();
+                } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
 
@@ -363,5 +365,3 @@ public class Bot extends TelegramLongPollingBot {
         ImageIO.write(tmpImage, "jpg", new File(getPathToSaved(chatId) + "/allSaved.jpg"));
     }
 }
-
-
